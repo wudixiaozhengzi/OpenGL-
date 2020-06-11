@@ -1,0 +1,38 @@
+有些图片并不需要半透明，只需要根据纹理颜色值，显示一部分，或者不显示一部分，没有中间情况。
+比如说草，如果想不太费劲地创建草这种东西，你需要将一个草的纹理贴在一个2D四边形(Quad)上，然后将这个四边形放到场景中。然而，草的形状和2D四边形的形状并不完全相同，所以你只想显示草纹理的某些部分，而忽略剩下的部分。
+
+所以当添加像草这样的植被到场景中时，我们不希望看到草的方形图像，而是只显示草的部分，并能看透图像其余的部分。
+我们想要丢弃(Discard)显示纹理中透明部分的片段，不将这些片段存储到颜色缓冲中。
+在此之前，我们还要学习如何加载一个透明的纹理。
+
+要想加载有alpha值的纹理，我们并不需要改很多东西，stb_image在纹理有alpha通道的时候会自动加载，但我们仍要在纹理生成过程中告诉OpenGL，我们的纹理现在使用alpha通道了：
+
+glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+同样，保证你在片段着色器中获取了纹理的全部4个颜色分量，而不仅仅是RGB分量：
+void main()
+{
+    // FragColor = vec4(vec3(texture(texture1, TexCoords)), 1.0);
+    FragColor = texture(texture1, TexCoords);
+}
+
+因为OpenGL默认是不知道怎么处理alpha值的，更不知道什么时候应该丢弃片段。
+我们需要自己手动来弄。幸运的是，有了着色器，这还是非常容易的。
+GLSL给了我们discard命令，一旦被调用，它就会保证片段不会被进一步处理，所以就不会进入颜色缓冲。
+有了这个指令，我们就能够在片段着色器中检测一个片段的alpha值是否低于某个阈值，如果是的话，则丢弃这个片段，就好像它不存在一样：
+
+#version 330 core
+out vec4 FragColor;
+in vec2 TexCoords;
+uniform sampler2D texture1;
+void main()
+{             
+    vec4 texColor = texture(texture1, TexCoords);
+    if(texColor.a < 0.1)
+        discard;
+    FragColor = texColor;
+}
+这里，我们检测被采样的纹理颜色的alpha值是否低于0.1的阈值，如果是的话，则丢弃这个片段。
+片段着色器保证了它只会渲染不是（几乎）完全透明的片段。
+
+
+
